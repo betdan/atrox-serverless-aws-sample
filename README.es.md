@@ -89,7 +89,7 @@ Se encarga de resolver idempotencia.
 
 ### Unified Gateway
 
-`atrox_entity_api/unified_gateway`
+`atrox_entity_api/atrox_api_gateway`
 
 Crea un solo API Gateway para enrutar hacia las Lambdas ya desplegadas, de forma que el consumidor tenga un único punto de entrada y una sola API key.
 
@@ -376,10 +376,10 @@ Parámetros adicionales para `update` y `delete`:
 - `IdempotencyApiUrl`
 - `IdempotencyRequestIdHeader=x-idempotency-key`
 
-### Paso 7. Desplegar unified gateway
+### Paso 7. Desplegar Api Gateway
 
 ```powershell
-cd .\atrox_entity_api\unified_gateway
+cd .\atrox_entity_api\atrox_api_gateway
 sam validate -t template.yaml
 sam build -t template.yaml
 sam deploy --guided
@@ -479,11 +479,11 @@ aws apigateway get-api-keys --include-values --region us-east-2
 - `delete` es eliminación lógica
 - `list` soporta filtro opcional por `status`
 - `update` y `delete` requieren `x-idempotency-key`
-- el unified gateway usa una sola API key y un solo usage plan
+- el Api Gateway usa una sola API key y un solo usage plan
 
-## 13. Por qué este proyecto sirve como ejemplo de portafolio
+## 13. Que permite este proyecto
 
-Este proyecto demuestra mucho más que un CRUD básico. Permite mostrar:
+Demuestra mucho más que un CRUD básico. Permite mostrar:
 
 - arquitectura serverless en AWS
 - despliegue cloud con SAM

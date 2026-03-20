@@ -379,7 +379,7 @@ Additional parameters for `update` and `delete`:
 ### Step 7. Deploy unified gateway
 
 ```powershell
-cd .\atrox_entity_api\unified_gateway
+cd .\atrox_entity_api\atrox_api_gateway
 sam validate -t template.yaml
 sam build -t template.yaml
 sam deploy --guided
@@ -479,15 +479,15 @@ aws apigateway get-api-keys --include-values --region us-east-2
 - `delete` is implemented as soft delete
 - `list` supports optional `status` filter
 - `update` and `delete` require `x-idempotency-key`
-- unified gateway uses one shared API key and usage plan
+- Api gateway uses one shared API key and usage plan
 
-## 13. Why this project is useful as a portfolio sample
+## 13. What this project enables
 
-This project demonstrates more than a simple CRUD API. It shows:
+It demonstrates much more than basic CRUD operations. It allows you to showcase:
 
-- AWS serverless architecture
-- cloud deployment with SAM
-- real networking constraints and solutions
-- security and API consumption controls
-- asynchronous integration patterns
-- business-oriented API decomposition
+- Serverless architecture on AWS
+- Cloud deployment with SAM
+- Real-world network problem resolution
+- Security and consumption control via API Gateway
+- Asynchronous integration
+- Separation of responsibilities per service
