@@ -109,6 +109,10 @@ dist
 
 # Serverless directories
 .serverless/
+.aws-sam/
+
+# SAM configuration
+samconfig.toml
 
 # FuseBox cache
 .fusebox/
@@ -124,6 +128,29 @@ dist
 
 # Stores VSCode versions used for testing VSCode extensions
 .vscode-test
+.vscode/
+.idea/
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# Local certificates / secrets
+*.pem
+*.key
+*.crt
+
+# Local request / parameter payloads
+parameters.json
+parameters-*.json
+env.json
+event.json
+event-*.json
+
+# Terraform leftovers if used later
+*.tfstate
+*.tfstate.*
+.terraform/
 
 # yarn v3
 .pnp.*
