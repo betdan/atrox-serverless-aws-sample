@@ -1,0 +1,16 @@
+{
+  "name": "atrox-update-entity-api",
+  "version": "1.0.0",
+  "type": "module",
+  "private": true,
+  "engines": {
+    "node": ">=20"
+  },
+  "scripts": {
+    "start": "node ./entity.entrypoint/lambda/local-runner.js"
+  },
+  "dependencies": {
+    "@aws-sdk/client-sqs": "^3.883.0",
+    "pg": "^8.16.3"
+  }
+}

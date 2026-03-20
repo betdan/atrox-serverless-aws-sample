@@ -1,0 +1,203 @@
+AWSTemplateFormatVersion: '2010-09-09'
+Transform: AWS::Serverless-2016-10-31
+Description: atrox-list-entity-api
+
+Parameters:
+  AuditQueueUrl:
+    Type: String
+    Default: ""
+  AuditQueueArn:
+    Type: String
+    Default: "*"
+  PgHost:
+    Type: String
+  PgPort:
+    Type: String
+    Default: "5432"
+  PgDatabase:
+    Type: String
+  PgUser:
+    Type: String
+  PgPassword:
+    Type: String
+    NoEcho: true
+  PgSslMode:
+    Type: String
+    Default: require
+  VpcSubnetIds:
+    Type: CommaDelimitedList
+  VpcSecurityGroupIds:
+    Type: CommaDelimitedList
+
+Globals:
+  Function:
+    Runtime: nodejs20.x
+    Timeout: 15
+    MemorySize: 256
+    Architectures:
+      - x86_64
+    Tracing: Active
+  Api:
+    OpenApiVersion: 3.0.1
+
+Resources:
+  ListEntityApiGateway:
+    Type: AWS::Serverless::Api
+    Properties:
+      Name: atrox-list-entity-api-gateway
+      StageName: Prod
+      Auth:
+        ApiKeyRequired: true
+
+  ListEntityApiFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      FunctionName: atrox-list-entity-api
+      CodeUri: .
+      Handler: entity.entrypoint/lambda/api-handler.handler
+      Environment:
+        Variables:
+          LOG_LEVEL: info
+          LOG_SERVICE_NAME: atrox-list-entity-api
+          ENABLE_DEBUG_REQUEST_RESPONSE: false
+          AUDIT_QUEUE_URL: !Ref AuditQueueUrl
+          PGHOST: !Ref PgHost
+          PGPORT: !Ref PgPort
+          PGDATABASE: !Ref PgDatabase
+          PGUSER: !Ref PgUser
+          PGPASSWORD: !Ref PgPassword
+          PGSSLMODE: !Ref PgSslMode
+      VpcConfig:
+        SubnetIds: !Ref VpcSubnetIds
+        SecurityGroupIds: !Ref VpcSecurityGroupIds
+      Policies:
+        - Statement:
+            - Effect: Allow
+              Action:
+                - sqs:SendMessage
+              Resource: !Ref AuditQueueArn
+      Events:
+        Api:
+          Type: Api
+          Properties:
+            RestApiId: !Ref ListEntityApiGateway
+            Path: /entity/list
+            Method: post
+
+  ListEntityQueue:
+    Type: AWS::SQS::Queue
+    Properties:
+      QueueName: atrox-list-entity-queue
+      VisibilityTimeout: 30
+
+  ListEntityTopic:
+    Type: AWS::SNS::Topic
+    Properties:
+      TopicName: atrox-list-entity-topic
+
+  ListEntitySqsFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      FunctionName: atrox-list-entity-sqs
+      CodeUri: .
+      Handler: entity.entrypoint/lambda/sqs-handler.handler
+      Environment:
+        Variables:
+          LOG_LEVEL: info
+          LOG_SERVICE_NAME: atrox-list-entity-api
+          ENABLE_DEBUG_REQUEST_RESPONSE: false
+          AUDIT_QUEUE_URL: !Ref AuditQueueUrl
+          PGHOST: !Ref PgHost
+          PGPORT: !Ref PgPort
+          PGDATABASE: !Ref PgDatabase
+          PGUSER: !Ref PgUser
+          PGPASSWORD: !Ref PgPassword
+          PGSSLMODE: !Ref PgSslMode
+      VpcConfig:
+        SubnetIds: !Ref VpcSubnetIds
+        SecurityGroupIds: !Ref VpcSecurityGroupIds
+      Policies:
+        - Statement:
+            - Effect: Allow
+              Action:
+                - sqs:SendMessage
+              Resource: !Ref AuditQueueArn
+      Events:
+        Queue:
+          Type: SQS
+          Properties:
+            Queue: !GetAtt ListEntityQueue.Arn
+            BatchSize: 10
+            FunctionResponseTypes:
+              - ReportBatchItemFailures
+
+  ListEntitySnsFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      FunctionName: atrox-list-entity-sns
+      CodeUri: .
+      Handler: entity.entrypoint/lambda/sns-handler.handler
+      Environment:
+        Variables:
+          LOG_LEVEL: info
+          LOG_SERVICE_NAME: atrox-list-entity-api
+          ENABLE_DEBUG_REQUEST_RESPONSE: false
+          AUDIT_QUEUE_URL: !Ref AuditQueueUrl
+          PGHOST: !Ref PgHost
+          PGPORT: !Ref PgPort
+          PGDATABASE: !Ref PgDatabase
+          PGUSER: !Ref PgUser
+          PGPASSWORD: !Ref PgPassword
+          PGSSLMODE: !Ref PgSslMode
+      VpcConfig:
+        SubnetIds: !Ref VpcSubnetIds
+        SecurityGroupIds: !Ref VpcSecurityGroupIds
+      Policies:
+        - Statement:
+            - Effect: Allow
+              Action:
+                - sqs:SendMessage
+              Resource: !Ref AuditQueueArn
+      Events:
+        Topic:
+          Type: SNS
+          Properties:
+            Topic: !Ref ListEntityTopic
+
+  ListEntityApiKey:
+    Type: AWS::ApiGateway::ApiKey
+    Properties:
+      Name: atrox-list-entity-api-key
+      Enabled: true
+
+  ListEntityUsagePlan:
+    Type: AWS::ApiGateway::UsagePlan
+    DependsOn:
+      - ListEntityApiGatewayProdStage
+    Properties:
+      UsagePlanName: atrox-list-entity-usage-plan
+      Throttle:
+        BurstLimit: 20
+        RateLimit: 10
+      Quota:
+        Limit: 50000
+        Period: MONTH
+      ApiStages:
+        - ApiId: !Ref ListEntityApiGateway
+          Stage: Prod
+
+  ListEntityUsagePlanKey:
+    Type: AWS::ApiGateway::UsagePlanKey
+    DependsOn:
+      - ListEntityUsagePlan
+      - ListEntityApiKey
+    Properties:
+      KeyId: !Ref ListEntityApiKey
+      KeyType: API_KEY
+      UsagePlanId: !Ref ListEntityUsagePlan
+
+Outputs:
+  ListEntityApiUrl:
+    Value: !Sub https://${ListEntityApiGateway}.execute-api.${AWS::Region}.amazonaws.com/Prod/entity/list
+  ListEntityApiKeyId:
+    Value: !Ref ListEntityApiKey

@@ -1,0 +1,8 @@
+{
+  "Records": [
+    {
+      "messageId": "message-001",
+      "body": "{\"action\":\"CLIENT_CREATED\",\"payload\":{\"clientId\":1},\"response\":{\"code\":0,\"message\":\"Successful\"},\"status\":\"SUCCESS\"}"
+    }
+  ]
+}

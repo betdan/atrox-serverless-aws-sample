@@ -1,0 +1,160 @@
+AWSTemplateFormatVersion: '2010-09-09'
+Transform: AWS::Serverless-2016-10-31
+Description: atrox-entity-unified-gateway
+
+Parameters:
+  StageName:
+    Type: String
+    Default: atrox
+  GetEntityFunctionName:
+    Type: String
+    Default: atrox-get-entity-api
+  SetEntityFunctionName:
+    Type: String
+    Default: atrox-set-entity-api
+  UpdateEntityFunctionName:
+    Type: String
+    Default: atrox-update-entity-api
+  DeleteEntityFunctionName:
+    Type: String
+    Default: atrox-delete-entity-api
+  ListEntityFunctionName:
+    Type: String
+    Default: atrox-list-entity-api
+
+Globals:
+  Api:
+    OpenApiVersion: 3.0.1
+
+Resources:
+  AtroxEntityUnifiedApi:
+    Type: AWS::Serverless::Api
+    Properties:
+      Name: atrox-entity-unified-api-gateway
+      StageName: !Ref StageName
+      Auth:
+        ApiKeyRequired: true
+      DefinitionBody:
+        openapi: 3.0.1
+        info:
+          title: atrox-entity-unified-api
+          version: '1.0'
+        paths:
+          /entity/get:
+            post:
+              x-amazon-apigateway-integration:
+                httpMethod: POST
+                type: aws_proxy
+                uri: !Sub arn:aws:apigateway:${AWS::Region}:lambda:path/2015-03-31/functions/arn:aws:lambda:${AWS::Region}:${AWS::AccountId}:function:${GetEntityFunctionName}/invocations
+          /entity/create:
+            post:
+              x-amazon-apigateway-integration:
+                httpMethod: POST
+                type: aws_proxy
+                uri: !Sub arn:aws:apigateway:${AWS::Region}:lambda:path/2015-03-31/functions/arn:aws:lambda:${AWS::Region}:${AWS::AccountId}:function:${SetEntityFunctionName}/invocations
+          /entity/update:
+            put:
+              x-amazon-apigateway-integration:
+                httpMethod: POST
+                type: aws_proxy
+                uri: !Sub arn:aws:apigateway:${AWS::Region}:lambda:path/2015-03-31/functions/arn:aws:lambda:${AWS::Region}:${AWS::AccountId}:function:${UpdateEntityFunctionName}/invocations
+          /entity/delete:
+            delete:
+              x-amazon-apigateway-integration:
+                httpMethod: POST
+                type: aws_proxy
+                uri: !Sub arn:aws:apigateway:${AWS::Region}:lambda:path/2015-03-31/functions/arn:aws:lambda:${AWS::Region}:${AWS::AccountId}:function:${DeleteEntityFunctionName}/invocations
+          /entity/list:
+            post:
+              x-amazon-apigateway-integration:
+                httpMethod: POST
+                type: aws_proxy
+                uri: !Sub arn:aws:apigateway:${AWS::Region}:lambda:path/2015-03-31/functions/arn:aws:lambda:${AWS::Region}:${AWS::AccountId}:function:${ListEntityFunctionName}/invocations
+
+  GetEntityInvokePermission:
+    Type: AWS::Lambda::Permission
+    Properties:
+      Action: lambda:InvokeFunction
+      FunctionName: !Ref GetEntityFunctionName
+      Principal: apigateway.amazonaws.com
+      SourceArn: !Sub arn:aws:execute-api:${AWS::Region}:${AWS::AccountId}:${AtroxEntityUnifiedApi}/*/POST/entity/get
+
+  SetEntityInvokePermission:
+    Type: AWS::Lambda::Permission
+    Properties:
+      Action: lambda:InvokeFunction
+      FunctionName: !Ref SetEntityFunctionName
+      Principal: apigateway.amazonaws.com
+      SourceArn: !Sub arn:aws:execute-api:${AWS::Region}:${AWS::AccountId}:${AtroxEntityUnifiedApi}/*/POST/entity/create
+
+  UpdateEntityInvokePermission:
+    Type: AWS::Lambda::Permission
+    Properties:
+      Action: lambda:InvokeFunction
+      FunctionName: !Ref UpdateEntityFunctionName
+      Principal: apigateway.amazonaws.com
+      SourceArn: !Sub arn:aws:execute-api:${AWS::Region}:${AWS::AccountId}:${AtroxEntityUnifiedApi}/*/PUT/entity/update
+
+  DeleteEntityInvokePermission:
+    Type: AWS::Lambda::Permission
+    Properties:
+      Action: lambda:InvokeFunction
+      FunctionName: !Ref DeleteEntityFunctionName
+      Principal: apigateway.amazonaws.com
+      SourceArn: !Sub arn:aws:execute-api:${AWS::Region}:${AWS::AccountId}:${AtroxEntityUnifiedApi}/*/DELETE/entity/delete
+
+  ListEntityInvokePermission:
+    Type: AWS::Lambda::Permission
+    Properties:
+      Action: lambda:InvokeFunction
+      FunctionName: !Ref ListEntityFunctionName
+      Principal: apigateway.amazonaws.com
+      SourceArn: !Sub arn:aws:execute-api:${AWS::Region}:${AWS::AccountId}:${AtroxEntityUnifiedApi}/*/POST/entity/list
+
+  AtroxEntityUnifiedApiKey:
+    Type: AWS::ApiGateway::ApiKey
+    Properties:
+      Name: atrox-entity-unified-api-key
+      Enabled: true
+
+  AtroxEntityUnifiedUsagePlan:
+    Type: AWS::ApiGateway::UsagePlan
+    DependsOn:
+      - AtroxEntityUnifiedApiStage
+    Properties:
+      UsagePlanName: atrox-entity-unified-usage-plan
+      Throttle:
+        BurstLimit: 50
+        RateLimit: 25
+      Quota:
+        Limit: 100000
+        Period: MONTH
+      ApiStages:
+        - ApiId: !Ref AtroxEntityUnifiedApi
+          Stage: !Ref StageName
+
+  AtroxEntityUnifiedUsagePlanKey:
+    Type: AWS::ApiGateway::UsagePlanKey
+    DependsOn:
+      - AtroxEntityUnifiedUsagePlan
+      - AtroxEntityUnifiedApiKey
+    Properties:
+      KeyId: !Ref AtroxEntityUnifiedApiKey
+      KeyType: API_KEY
+      UsagePlanId: !Ref AtroxEntityUnifiedUsagePlan
+
+Outputs:
+  UnifiedApiBaseUrl:
+    Value: !Sub https://${AtroxEntityUnifiedApi}.execute-api.${AWS::Region}.amazonaws.com/${StageName}
+  UnifiedGetEntityUrl:
+    Value: !Sub https://${AtroxEntityUnifiedApi}.execute-api.${AWS::Region}.amazonaws.com/${StageName}/entity/get
+  UnifiedCreateEntityUrl:
+    Value: !Sub https://${AtroxEntityUnifiedApi}.execute-api.${AWS::Region}.amazonaws.com/${StageName}/entity/create
+  UnifiedUpdateEntityUrl:
+    Value: !Sub https://${AtroxEntityUnifiedApi}.execute-api.${AWS::Region}.amazonaws.com/${StageName}/entity/update
+  UnifiedDeleteEntityUrl:
+    Value: !Sub https://${AtroxEntityUnifiedApi}.execute-api.${AWS::Region}.amazonaws.com/${StageName}/entity/delete
+  UnifiedListEntityUrl:
+    Value: !Sub https://${AtroxEntityUnifiedApi}.execute-api.${AWS::Region}.amazonaws.com/${StageName}/entity/list
+  UnifiedApiKeyId:
+    Value: !Ref AtroxEntityUnifiedApiKey

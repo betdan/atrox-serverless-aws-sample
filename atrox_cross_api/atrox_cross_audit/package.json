@@ -1,0 +1,17 @@
+{
+  "name": "atrox-cross-audit-api",
+  "version": "1.0.0",
+  "type": "module",
+  "private": true,
+  "engines": {
+    "node": ">=20"
+  },
+  "scripts": {
+    "start": "node ./audit.entrypoint/lambda/local-runner.js",
+    "check": "node --check ./audit.entrypoint/lambda/handler.js"
+  },
+  "dependencies": {
+    "@aws-sdk/client-dynamodb": "^3.883.0",
+    "@aws-sdk/lib-dynamodb": "^3.883.0"
+  }
+}

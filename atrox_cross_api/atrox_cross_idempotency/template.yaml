@@ -1,0 +1,90 @@
+AWSTemplateFormatVersion: '2010-09-09'
+Transform: AWS::Serverless-2016-10-31
+Description: atrox-cross-idempotency-api
+
+Globals:
+  Function:
+    Runtime: nodejs20.x
+    Timeout: 10
+    MemorySize: 256
+    Architectures:
+      - x86_64
+    Tracing: Active
+
+Resources:
+  IdempotencyApiFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      FunctionName: atrox-cross-idempotency-api
+      CodeUri: .
+      Handler: idempotency.entrypoint/lambda/api-handler.handler
+      Environment:
+        Variables:
+          LOG_LEVEL: info
+          LOG_SERVICE_NAME: atrox-cross-idempotency-api
+          IDEMPOTENCY_TABLE_NAME: atrox-idempotency
+          IDEMPOTENCY_REQUEST_ID_HEADER: x-idempotency-key
+          ENABLE_DEBUG_REQUEST_RESPONSE: false
+      Policies:
+        - DynamoDBCrudPolicy:
+            TableName: atrox-idempotency
+      Events:
+        Api:
+          Type: Api
+          Properties:
+            Path: /idempotency/resolve
+            Method: post
+  IdempotencyQueue:
+    Type: AWS::SQS::Queue
+    Properties:
+      QueueName: atrox-cross-idempotency-queue
+      VisibilityTimeout: 30
+  IdempotencyTopic:
+    Type: AWS::SNS::Topic
+    Properties:
+      TopicName: atrox-cross-idempotency-topic
+  IdempotencySqsFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      FunctionName: atrox-cross-idempotency-sqs
+      CodeUri: .
+      Handler: idempotency.entrypoint/lambda/sqs-handler.handler
+      Environment:
+        Variables:
+          LOG_LEVEL: info
+          LOG_SERVICE_NAME: atrox-cross-idempotency-api
+          IDEMPOTENCY_TABLE_NAME: atrox-idempotency
+          IDEMPOTENCY_REQUEST_ID_HEADER: x-idempotency-key
+          ENABLE_DEBUG_REQUEST_RESPONSE: false
+      Policies:
+        - DynamoDBCrudPolicy:
+            TableName: atrox-idempotency
+      Events:
+        Queue:
+          Type: SQS
+          Properties:
+            Queue: !GetAtt IdempotencyQueue.Arn
+            BatchSize: 10
+            FunctionResponseTypes:
+              - ReportBatchItemFailures
+  IdempotencySnsFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      FunctionName: atrox-cross-idempotency-sns
+      CodeUri: .
+      Handler: idempotency.entrypoint/lambda/sns-handler.handler
+      Environment:
+        Variables:
+          LOG_LEVEL: info
+          LOG_SERVICE_NAME: atrox-cross-idempotency-api
+          IDEMPOTENCY_TABLE_NAME: atrox-idempotency
+          IDEMPOTENCY_REQUEST_ID_HEADER: x-idempotency-key
+          ENABLE_DEBUG_REQUEST_RESPONSE: false
+      Policies:
+        - DynamoDBCrudPolicy:
+            TableName: atrox-idempotency
+      Events:
+        Topic:
+          Type: SNS
+          Properties:
+            Topic: !Ref IdempotencyTopic

@@ -1,99 +1,99 @@
 # atrox-serverless-aws-sample
 
-`atrox-serverless-aws-sample` is a sample AWS serverless solution built around independent Lambda services, a unified API Gateway, Aurora PostgreSQL, DynamoDB, SQS, SNS, and shared infrastructure for secure networking inside a VPC.
+`atrox-serverless-aws-sample` es una solución de ejemplo en AWS serverless construida alrededor de servicios Lambda independientes, un API Gateway unificado, Aurora PostgreSQL, DynamoDB, SQS, SNS e infraestructura compartida para comunicación segura dentro de una VPC.
 
-This project is meant to demonstrate:
+El objetivo del proyecto es demostrar:
 
-- serverless backend design on AWS
-- layered architecture in Node.js
-- API Gateway + Lambda integration
-- Aurora PostgreSQL connectivity from Lambda
-- asynchronous audit processing with SQS
-- idempotency for mutable operations
-- VPC, Security Groups, route tables, VPC endpoints, and NAT Gateway usage
+- diseño backend serverless en AWS
+- arquitectura por capas en Node.js
+- integración API Gateway + Lambda
+- conectividad Lambda hacia Aurora PostgreSQL
+- auditoría asíncrona por SQS
+- idempotencia para operaciones mutables
+- uso de VPC, Security Groups, tablas de rutas, VPC endpoints y NAT Gateway
 
-## 1. Solution Overview
+## 1. Visión general de la solución
 
-The sample is organized into three main domains:
+El sample se organiza en tres dominios principales:
 
 - `atrox_database`
-  Database scripts for Aurora PostgreSQL and DynamoDB.
+  Scripts de base de datos para Aurora PostgreSQL y DynamoDB.
 - `atrox_cross_api`
-  Shared cross-cutting serverless services such as audit and idempotency.
+  Servicios serverless transversales como auditoría e idempotencia.
 - `atrox_entity_api`
-  Entity-focused Lambda APIs: get, create, update, delete, and list.
+  APIs Lambda orientadas a entity: consulta, creación, actualización, eliminación y listado.
 
-## 2. Main Components
+## 2. Componentes principales
 
 ### Aurora PostgreSQL
 
-Aurora stores transactional data such as:
+Aurora almacena datos transaccionales como:
 
 - `entity`
 - `catalog`
 - `client`
 - `address`
 
-SQL scripts create:
+Los scripts SQL crean:
 
-- tables
+- tablas
 - constraints
-- indexes
-- stored functions
-- seed data
+- índices
+- funciones almacenadas
+- datos semilla
 
 ### DynamoDB
 
-DynamoDB is used for cross services:
+DynamoDB se usa en servicios transversales:
 
 - `atrox-idempotency`
 - `atrox-audit`
 
-### Cross APIs
+### APIs cross
 
 #### `atrox_cross_audit_api`
 
-Responsible for asynchronous audit registration.
+Se encarga del registro asíncrono de auditoría.
 
-- consumes SQS and SNS
-- persists audit records into DynamoDB
-- keeps audit concerns out of the business Lambdas
+- consume SQS y SNS
+- persiste auditoría en DynamoDB
+- desacopla la auditoría de la lógica de negocio principal
 
 #### `atrox_cross_idempotency_api`
 
-Responsible for idempotency resolution.
+Se encarga de resolver idempotencia.
 
-- exposed through API Gateway
-- checks existing request state
-- returns HIT / MISS / CONFLICT style outcomes
+- se expone por API Gateway
+- valida estado previo de una solicitud
+- responde escenarios tipo HIT / MISS / CONFLICT
 
-### Entity APIs
+### APIs de entity
 
 #### `atrox_get_entity_api`
-- reads one entity by id
+- consulta una entidad por id
 
 #### `atrox_set_entity_api`
-- creates a new entity
+- crea una nueva entidad
 
 #### `atrox_update_entity_api`
-- updates an entity
-- validates idempotency through the idempotency API
+- actualiza una entidad
+- valida idempotencia llamando al servicio de idempotencia
 
 #### `atrox_delete_entity_api`
-- performs soft delete
-- validates idempotency through the idempotency API
+- realiza eliminación lógica
+- valida idempotencia llamando al servicio de idempotencia
 
 #### `atrox_list_entity_api`
-- returns all entities
-- optionally filters by `status`
+- retorna todas las entidades
+- permite filtro opcional por `status`
 
 ### Unified Gateway
 
 `atrox_entity_api/unified_gateway`
 
-Creates a single API Gateway that routes to the previously deployed Lambda functions, so the solution can be consumed through one shared entry point and one shared API key.
+Crea un solo API Gateway para enrutar hacia las Lambdas ya desplegadas, de forma que el consumidor tenga un único punto de entrada y una sola API key.
 
-Example routes:
+Rutas de ejemplo:
 
 - `POST /atrox/entity/get`
 - `POST /atrox/entity/create`
@@ -101,93 +101,93 @@ Example routes:
 - `DELETE /atrox/entity/delete`
 - `POST /atrox/entity/list`
 
-Important note:
+Nota importante:
 
-With API Gateway REST APIs, the visible URL format is:
+Con API Gateway REST el formato visible de la URL es:
 
 ```text
 https://{api-id}.execute-api.{region}.amazonaws.com/{stage}/{path}
 ```
 
-In this sample, the stage is intentionally configured as `atrox` so that the URL reads like:
+En este proyecto el `stage` se configuró como `atrox`, por eso la URL se ve así:
 
 ```text
 /atrox/entity/get
 ```
 
-## 3. Layered Architecture
+## 3. Arquitectura por capas
 
-Each Lambda service follows a layered structure:
+Cada servicio Lambda sigue esta estructura:
 
 - `entrypoint`
-  Lambda handlers and channel adapters (API, SQS, SNS)
+  Handlers Lambda y adaptadores por canal (API, SQS, SNS)
 - `application`
-  Use cases and application orchestration
+  Casos de uso y orquestación
 - `domain`
-  Entities, contracts, business services
+  Entidades, contratos y servicios de negocio
 - `infrastructure`
-  PostgreSQL repositories, DynamoDB repositories, audit dispatchers, idempotency clients, config
+  Repositorios PostgreSQL, repositorios DynamoDB, despachadores de auditoría, clientes de idempotencia, configuración
 - `shared`
-  HTTP responses, logging, metrics, helpers
+  Respuestas HTTP, logging, métricas y utilitarios
 
-This separation keeps transport, business logic, and infrastructure concerns isolated.
+Esto mantiene separadas las responsabilidades de transporte, negocio e infraestructura.
 
-## 4. High-Level Flow
+## 4. Flujo de alto nivel
 
-### Read Flow
+### Flujo de lectura
 
-1. API Gateway receives a request
-2. Lambda handler maps the request
-3. Application use case executes
-4. Repository reads from Aurora PostgreSQL
-5. Audit event is sent asynchronously to SQS
-6. Response is returned to API Gateway
+1. API Gateway recibe una solicitud
+2. El handler Lambda mapea la entrada
+3. Se ejecuta el caso de uso
+4. El repositorio consulta Aurora PostgreSQL
+5. Se envía auditoría de forma asíncrona a SQS
+6. Se devuelve la respuesta a API Gateway
 
-### Update/Delete Flow
+### Flujo de update/delete
 
-1. API Gateway receives a mutable request
-2. Lambda reads `x-idempotency-key`
-3. Lambda calls the idempotency API
-4. If the request is a HIT, it returns the stored response
-5. If the request is a MISS, business logic continues
-6. Data is updated in Aurora PostgreSQL
-7. Audit event is dispatched to SQS
-8. Final response is returned
+1. API Gateway recibe una solicitud mutable
+2. Lambda lee `x-idempotency-key`
+3. Lambda llama al API de idempotencia
+4. Si es HIT, retorna la respuesta previa
+5. Si es MISS, continúa la lógica de negocio
+6. Se actualiza Aurora PostgreSQL
+7. Se envía auditoría a SQS
+8. Se retorna la respuesta final
 
-## 5. Network and VPC Design
+## 5. Diseño de red y VPC
 
-Aurora PostgreSQL runs inside a VPC. Lambda functions do not automatically join that VPC unless `VpcConfig` is explicitly defined.
+Aurora PostgreSQL vive dentro de una VPC. Las Lambdas no entran automáticamente a esa VPC si no se declara explícitamente `VpcConfig`.
 
-That is why network configuration was required.
+Por eso fue necesario configurar red.
 
-### VPC-related resources used in the sample
+### Recursos de red usados
 
 - VPC
-- private subnets for Lambda
-- security group for Lambda
-- security group for Aurora
-- VPC endpoint for SQS
-- NAT Gateway for outbound internet access
-- private route table for Lambda subnets
+- subnets privadas para Lambda
+- security group para Lambda
+- security group para Aurora
+- VPC endpoint para SQS
+- NAT Gateway para salida a internet
+- tabla de rutas privada para las subnets de Lambda
 
-### Why this was needed
+### Por qué fue necesario
 
 #### Lambda -> Aurora
 
-Aurora is private and requires:
+Aurora es privada y requiere:
 
-- same VPC
-- allowed security group ingress on port `5432`
+- misma VPC
+- regla de ingreso permitida por security group en puerto `5432`
 
 #### Lambda -> SQS
 
-Audit dispatch from VPC-based Lambdas required private access to SQS.
+La auditoría desde Lambdas en VPC requirió acceso privado a SQS.
 
-#### Lambda -> Public Idempotency API
+#### Lambda -> API pública de idempotencia
 
-`update` and `delete` call a public API Gateway URL for idempotency. Since those Lambdas run in private subnets, outbound internet access was needed through a NAT Gateway.
+`update` y `delete` llaman a una URL pública de API Gateway para idempotencia. Como esas Lambdas están en subnets privadas, necesitaron salida a internet mediante NAT Gateway.
 
-## 6. Reference Architecture Diagram
+## 6. Diagrama de arquitectura de referencia
 
 ```text
                            +-----------------------------+
@@ -206,7 +206,7 @@ Audit dispatch from VPC-based Lambdas required private access to SQS.
                    v                                    v
        +-----------------------------+      +------------------------------+
        |      Aurora PostgreSQL      |      |         SQS Audit Queue      |
-       |       private in VPC        |      |   atrox-cross-audit-queue    |
+       |       privado en VPC        |      |   atrox-cross-audit-queue    |
        +-----------------------------+      +------------------------------+
                                      |
                                      v
@@ -216,12 +216,12 @@ Audit dispatch from VPC-based Lambdas required private access to SQS.
                                        |
                                        v
                          +---------------------------+
-                         |  Public Idempotency API   |
+                         |  API pública Idempotency  |
                          |  API Gateway + Lambda     |
                          +---------------------------+
 ```
 
-## 7. Project Structure
+## 7. Estructura del proyecto
 
 ```text
 atrox_database/
@@ -242,17 +242,17 @@ atrox_entity_api/
   unified_gateway/
 ```
 
-## 8. Installation and Deployment Procedure
+## 8. Procedimiento de instalación y despliegue
 
-### Prerequisites
+### Prerrequisitos
 
 - AWS CLI
 - AWS SAM CLI
 - Node.js
-- PostgreSQL client (`psql`)
-- AWS credentials configured locally
+- cliente PostgreSQL (`psql`)
+- credenciales AWS configuradas localmente
 
-Validation commands:
+Validaciones:
 
 ```powershell
 aws --version
@@ -262,15 +262,15 @@ psql --version
 aws sts get-caller-identity
 ```
 
-### Step 1. Prepare Aurora PostgreSQL
+### Paso 1. Preparar Aurora PostgreSQL
 
-Run the main Aurora script:
+Ejecutar el script principal de Aurora:
 
 ```powershell
 psql -f ".\atrox_database\Aurora\run_all.sql"
 ```
 
-Validate:
+Validar:
 
 ```sql
 \dt
@@ -279,14 +279,14 @@ SELECT current_database();
 SELECT * FROM entity LIMIT 10;
 ```
 
-### Step 2. Prepare DynamoDB
+### Paso 2. Preparar DynamoDB
 
-Create or validate:
+Crear o validar:
 
 - `atrox-idempotency`
 - `atrox-audit`
 
-Validation:
+Validaciones:
 
 ```powershell
 aws dynamodb list-tables --region us-east-2
@@ -294,20 +294,20 @@ aws dynamodb describe-table --table-name atrox-idempotency --region us-east-2
 aws dynamodb describe-table --table-name atrox-audit --region us-east-2
 ```
 
-### Step 3. Deploy cross services
+### Paso 3. Desplegar servicios cross
 
-Deploy:
+Desplegar:
 
 - `atrox_cross_audit_api`
 - `atrox_cross_idempotency_api`
 
-After deployment, collect:
+Después del despliegue, obtener:
 
-- audit queue URL
-- audit queue ARN
-- idempotency API URL
+- URL de la cola de auditoría
+- ARN de la cola de auditoría
+- URL del API de idempotencia
 
-Useful commands:
+Comandos útiles:
 
 ```powershell
 aws sqs get-queue-url --queue-name atrox-cross-audit-queue --region us-east-2
@@ -315,19 +315,19 @@ aws sqs get-queue-attributes --queue-url "QUEUE_URL" --attribute-names QueueArn 
 aws sns list-topics --region us-east-2
 ```
 
-### Step 4. Prepare shared entity infrastructure
+### Paso 4. Preparar infraestructura compartida de entity
 
-Deploy shared infrastructure under:
+Desplegar el stack:
 
 - `atrox_entity_api/infrastructure`
 
-This stack is responsible for:
+Este stack resuelve:
 
-- Lambda security group reuse/creation
-- RDS ingress support
-- SQS endpoint reuse
+- reuse/creación del security group de Lambda
+- soporte de acceso al RDS
+- reuse del endpoint SQS
 
-Example deployment:
+Ejemplo:
 
 ```powershell
 cd .\atrox_entity_api\infrastructure
@@ -336,29 +336,29 @@ sam build -t template.yaml
 sam deploy --stack-name atrox-entity-infrastructure --region us-east-2 --capabilities CAPABILITY_IAM --parameter-overrides VpcId=vpc-XXXXXXXX SubnetIds=subnet-AAA,subnet-BBB RdsSecurityGroupId=sg-RDS ExistingLambdaSecurityGroupId=sg-LAMBDA ExistingSqsVpcEndpointId=vpce-SQS
 ```
 
-### Step 5. Configure route table and NAT
+### Paso 5. Configurar NAT y tabla de rutas
 
-For `update` and `delete`, private Lambdas need outbound internet access to call the public idempotency API.
+Para `update` y `delete`, las Lambdas privadas necesitan salida a internet para llamar al API público de idempotencia.
 
-Required:
+Se requiere:
 
 - NAT Gateway
-- private route table
+- tabla de rutas privada
 - `0.0.0.0/0 -> nat-...`
-- association of Lambda subnets to that route table
+- asociación de las subnets de Lambda a esa tabla
 
-### Step 6. Deploy entity services
+### Paso 6. Desplegar servicios entity
 
-For each entity service:
+Para cada servicio:
 
 ```powershell
-cd .\atrox_entity_api\SERVICE_NAME
+cd .\atrox_entity_api\NOMBRE_SERVICIO
 sam validate -t template.yaml
 sam build -t template.yaml
 sam deploy --guided
 ```
 
-Main parameters:
+Parámetros principales:
 
 - `AuditQueueUrl`
 - `AuditQueueArn`
@@ -371,12 +371,12 @@ Main parameters:
 - `VpcSubnetIds`
 - `VpcSecurityGroupIds`
 
-Additional parameters for `update` and `delete`:
+Parámetros adicionales para `update` y `delete`:
 
 - `IdempotencyApiUrl`
 - `IdempotencyRequestIdHeader=x-idempotency-key`
 
-### Step 7. Deploy unified gateway
+### Paso 7. Desplegar unified gateway
 
 ```powershell
 cd .\atrox_entity_api\unified_gateway
@@ -385,13 +385,13 @@ sam build -t template.yaml
 sam deploy --guided
 ```
 
-Recommended values:
+Valores recomendados:
 
 - `Stack Name`: `atrox-entity-unified-gateway`
 - `AWS Region`: `us-east-2`
 - `StageName`: `atrox`
 
-## 9. API Usage Examples
+## 9. Ejemplos de consumo de API
 
 ### Get entity
 
@@ -419,25 +419,25 @@ curl.exe -i -X DELETE "https://TU_API_ID.execute-api.us-east-2.amazonaws.com/atr
 
 ### List entities
 
-All:
+Todos:
 
 ```powershell
 curl.exe -i -X POST "https://TU_API_ID.execute-api.us-east-2.amazonaws.com/atrox/entity/list" -H "Content-Type: application/json" -H "x-api-key: TU_API_KEY" --data-raw "{}"
 ```
 
-Only active:
+Solo activos:
 
 ```powershell
 curl.exe -i -X POST "https://TU_API_ID.execute-api.us-east-2.amazonaws.com/atrox/entity/list" -H "Content-Type: application/json" -H "x-api-key: TU_API_KEY" --data-raw "{""status"":1}"
 ```
 
-Only deleted:
+Solo eliminados:
 
 ```powershell
 curl.exe -i -X POST "https://TU_API_ID.execute-api.us-east-2.amazonaws.com/atrox/entity/list" -H "Content-Type: application/json" -H "x-api-key: TU_API_KEY" --data-raw "{""status"":0}"
 ```
 
-## 10. Validation Commands
+## 10. Comandos útiles de validación
 
 CloudFormation:
 
@@ -465,29 +465,29 @@ API Keys:
 aws apigateway get-api-keys --include-values --region us-east-2
 ```
 
-## 11. Key Design Decisions
+## 11. Decisiones principales de diseño
 
-- independent Lambda per action instead of one large CRUD handler
-- shared API Gateway option for client simplicity
-- audit as asynchronous concern through SQS
-- idempotency as a separate reusable service
-- layered architecture for maintainability
-- VPC-based design for secure Aurora access
+- Lambda independiente por acción en lugar de un CRUD monolítico
+- opción de API Gateway unificado para simplificar el consumo
+- auditoría como responsabilidad asíncrona mediante SQS
+- idempotencia como servicio separado y reutilizable
+- arquitectura por capas para mantenibilidad
+- diseño sobre VPC para acceso seguro hacia Aurora
 
-## 12. Notes
+## 12. Notas importantes
 
-- `delete` is implemented as soft delete
-- `list` supports optional `status` filter
-- `update` and `delete` require `x-idempotency-key`
-- unified gateway uses one shared API key and usage plan
+- `delete` es eliminación lógica
+- `list` soporta filtro opcional por `status`
+- `update` y `delete` requieren `x-idempotency-key`
+- el unified gateway usa una sola API key y un solo usage plan
 
-## 13. Why this project is useful as a portfolio sample
+## 13. Por qué este proyecto sirve como ejemplo de portafolio
 
-This project demonstrates more than a simple CRUD API. It shows:
+Este proyecto demuestra mucho más que un CRUD básico. Permite mostrar:
 
-- AWS serverless architecture
-- cloud deployment with SAM
-- real networking constraints and solutions
-- security and API consumption controls
-- asynchronous integration patterns
-- business-oriented API decomposition
+- arquitectura serverless en AWS
+- despliegue cloud con SAM
+- resolución real de problemas de red
+- seguridad y control de consumo vía API Gateway
+- integración asíncrona
+- separación de responsabilidades por servicio

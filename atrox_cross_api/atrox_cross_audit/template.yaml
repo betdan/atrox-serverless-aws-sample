@@ -1,0 +1,66 @@
+AWSTemplateFormatVersion: '2010-09-09'
+Transform: AWS::Serverless-2016-10-31
+Description: atrox-cross-audit-api
+
+Globals:
+  Function:
+    Runtime: nodejs20.x
+    Timeout: 10
+    MemorySize: 256
+    Architectures:
+      - x86_64
+    Tracing: Active
+
+Resources:
+  AuditQueue:
+    Type: AWS::SQS::Queue
+    Properties:
+      QueueName: atrox-cross-audit-queue
+      VisibilityTimeout: 30
+  AuditTopic:
+    Type: AWS::SNS::Topic
+    Properties:
+      TopicName: atrox-cross-audit-topic
+  AuditSqsFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      FunctionName: atrox-cross-audit-sqs
+      CodeUri: .
+      Handler: audit.entrypoint/lambda/sqs-handler.handler
+      Environment:
+        Variables:
+          LOG_LEVEL: info
+          LOG_SERVICE_NAME: atrox-cross-audit-api
+          AUDIT_TABLE_NAME: atrox-audit
+          ENABLE_DEBUG_REQUEST_RESPONSE: false
+      Policies:
+        - DynamoDBCrudPolicy:
+            TableName: atrox-audit
+      Events:
+        Queue:
+          Type: SQS
+          Properties:
+            Queue: !GetAtt AuditQueue.Arn
+            BatchSize: 10
+            FunctionResponseTypes:
+              - ReportBatchItemFailures
+  AuditSnsFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      FunctionName: atrox-cross-audit-sns
+      CodeUri: .
+      Handler: audit.entrypoint/lambda/sns-handler.handler
+      Environment:
+        Variables:
+          LOG_LEVEL: info
+          LOG_SERVICE_NAME: atrox-cross-audit-api
+          AUDIT_TABLE_NAME: atrox-audit
+          ENABLE_DEBUG_REQUEST_RESPONSE: false
+      Policies:
+        - DynamoDBCrudPolicy:
+            TableName: atrox-audit
+      Events:
+        Topic:
+          Type: SNS
+          Properties:
+            Topic: !Ref AuditTopic
